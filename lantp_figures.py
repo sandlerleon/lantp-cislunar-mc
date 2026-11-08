@@ -24,7 +24,7 @@ def fig_thermo(R):
         ax[0].plot(T, t[k], ls, color=C1, lw=1.4, label=lab)
     ax[0].axvspan(2600, 2900, color="0.88"); ax[0].text(2650, 0.9, "core\nlimit", fontsize=7); ax[0].axvline(4500, color=C2, lw=0.8)
     ax[0].set_xlabel("Chamber temperature $T_c$ (K)"); ax[0].set_ylabel("H$_2$ dissociation degree $\\alpha$"); ax[0].legend(frameon=False); ax[0].set_title("(a)", loc="left", fontsize=9)
-    ax[1].axhspan(1300, 1500, color=C4, alpha=0.25); ax[1].text(2050, 1510, "claimed 1300-1500 s", fontsize=7)
+    ax[1].axhspan(1300, 1500, color=C4, alpha=0.25); ax[1].text(2050, 1510, "targeted 1300-1500 s", fontsize=7)
     ax[1].plot(T, t["frozen"], color=C1, lw=1.4, label="frozen, $\\phi=0$"); ax[1].plot(T, t["partial"], color=C3, lw=1.4, label="partial, $\\phi=0.3$"); ax[1].plot(T, t["shifting"], "--", color=GR, lw=1.4, label="shifting equilibrium (bound)")
     ax[1].plot(T, t["eq1_14"], ":", color=C2, lw=1.6, label="ideal gas, $\\gamma=1.4$"); ax[1].plot(T, t["eq1_13"], "-.", color=C2, lw=1, label="ideal gas, $\\gamma=1.3$"); ax[1].axvline(4500, color=C2, lw=0.8)
     ax[1].set_ylim(600, 2300); ax[1].set_xlabel("Chamber temperature $T_c$ (K)"); ax[1].set_ylabel("Specific impulse (s)"); ax[1].legend(frameon=False, fontsize=6.5, loc="upper left"); ax[1].set_title("(b) $p_c$ = 3 MPa, $\\eta_n$ = 0.94", loc="left", fontsize=9)
@@ -34,7 +34,7 @@ def fig_thermo(R):
 def fig_power(R):
     p = R["power"]; rho = np.array(p["rho"])
     fig, ax = plt.subplots(figsize=(4.4, 3.3))
-    ax.axvspan(0.001, p["rho_claim"][1], color=C2, alpha=0.15); ax.text(0.0014, 2200, "claimed 1-50 MW laser\non 100-500 MW$_t$ reactor", color=C2, fontsize=7, va="top")
+    ax.axvspan(0.001, p["rho_claim"][1], color=C2, alpha=0.15); ax.text(0.0014, 2200, "targeted 1-50 MW laser\non 100-500 MW$_t$ reactor", color=C2, fontsize=7, va="top")
     ax.axhspan(1300, 1500, color=C4, alpha=0.25)
     ax.fill_between(rho, p["q05"], p["q95"], color=C1, alpha=0.3, label="Monte Carlo 5-95%"); ax.plot(rho, p["q50"], color=C1, lw=1.6, label="median")
     ax.plot(rho, p["frozen"], ":", color=GR, lw=1.2, label="frozen (nominal)"); ax.plot(rho, p["shifting"], "--", color=GR, lw=1.2, label="shifting equilibrium (nominal)")
@@ -48,8 +48,8 @@ def fig_laser(R):
     for key, col in (("1300", C3), ("1400", C1), ("1500", C2)):
         rows = lt[key]; ax.plot(F, [r["P_emit"][1] for r in rows], color=col, lw=1.6, label="target $I_{sp}$ %s s" % key)
         ax.fill_between(F, [r["P_emit"][0] for r in rows], [r["P_emit"][2] for r in rows], color=col, alpha=0.12)
-    ax.axvspan(50, 120, color="0.9"); ax.text(52, 8e4, "claimed thrust\n50-120 kN", fontsize=7, va="top")
-    ax.axhspan(1, 50, color=C2, alpha=0.15); ax.text(22, 1.6, "claimed 'multi-megawatt' (1-50 MW)", color=C2, fontsize=7)
+    ax.axvspan(50, 120, color="0.9"); ax.text(52, 8e4, "targeted thrust\n50-120 kN", fontsize=7, va="top")
+    ax.axhspan(1, 50, color=C2, alpha=0.15); ax.text(22, 1.6, "targeted 'multi-megawatt' (1-50 MW)", color=C2, fontsize=7)
     ax.set_yscale("log"); ax.set_ylim(1, 1e5); ax.set_xlabel("Thrust (kN)"); ax.set_ylabel("Emitted laser power (MW)"); ax.legend(frameon=False, fontsize=7, loc="lower right", bbox_to_anchor=(1, 0.2))
     save(fig, "Fig4_laser_power_thrust.png")
 
@@ -87,11 +87,32 @@ def fig_mc(R):
     save(fig, "Fig7_mc_distributions.png")
 
 
+def fig_opt(R):
+    o = R["opt_mc"]; ratio = np.array(o["ratio_opt"]); ratio = ratio[np.isfinite(ratio)]; q = o["q_ratio_opt"]
+    fig, ax = plt.subplots(1, 3, figsize=(7.8, 2.9))
+    ax[0].hist(ratio, bins=np.linspace(0.8, 2.4, 40), color=C1, alpha=0.8); ax[0].axvspan(q[0], q[4], color=C4, alpha=0.25)
+    ax[0].axvline(q[2], color=C1, lw=1.4); ax[0].axvline(1.0, color="0.3", lw=1); ax[0].axvline(0.6, color=C2, ls="--", lw=1.2)
+    top = ax[0].get_ylim()[1]; ax[0].text(q[2] + 0.03, top * 0.97, "median %.2f" % q[2], fontsize=7, color=C1, va="top"); ax[0].text(2.38, top * 0.85, "5th-95th percentile\n%.2f-%.2f (shaded)" % (q[0], q[4]), fontsize=7, ha="right", va="top")
+    ax[0].text(0.58, top * 0.5, "targeted 0.6", color=C2, fontsize=7, rotation=90, va="center"); ax[0].set_xlim(0.5, 2.4)
+    ax[0].set_xlabel("IMLEO(LANTP) / IMLEO(NTP), each with its\noptimized reactor power"); ax[0].set_ylabel("Trials"); ax[0].set_title("(a)", loc="left", fontsize=9)
+    g = np.array(o["grid_MW"]); w = 0.38; xi = np.arange(len(g))
+    cn = [np.sum(np.array(o["best_P_ntp"]) == p) for p in g]; cl = [np.sum(np.array(o["best_P_lantp"]) == p) for p in g]
+    ax[1].bar(xi - w / 2, cn, w, color=C1, label="conventional NTP"); ax[1].bar(xi + w / 2, cl, w, color=C3, label="laser-assisted")
+    ax[1].set_xticks(xi); ax[1].set_xticklabels([("%g" % p) for p in g], rotation=60, fontsize=6.5)
+    ax[1].set_xlabel("Optimal reactor power (MWt)"); ax[1].set_ylabel("Trials"); ax[1].legend(frameon=False, fontsize=6.5); ax[1].set_title("(b)", loc="left", fontsize=9)
+    mn = np.array(o["M_ntp_opt"]) / 1e3; ml = np.array(o["M_lantp_opt"]) / 1e3
+    ax[2].scatter(mn, ml, s=5, color=C1, alpha=0.5); x0, x1 = mn.min() * 0.95, mn.max() * 1.05; xx = np.array([x0, x1])
+    ax[2].plot(xx, xx, color="0.3", lw=1); ax[2].plot(xx, 0.6 * xx, color=C2, ls="--", lw=1.2); ax[2].set_xlim(x0, x1); ax[2].set_ylim(0.6 * x0 * 0.95, ml.max() * 1.05)
+    ax[2].text(x1, x1, "equal IMLEO ", fontsize=6.5, ha="right", va="bottom"); ax[2].text(x1, 0.6 * x1, "targeted 0.6 ", color=C2, fontsize=6.5, ha="right", va="top")
+    ax[2].set_xlabel("IMLEO of conventional NTP (t)"); ax[2].set_ylabel("IMLEO of laser-assisted tug (t)"); ax[2].set_title("(c)", loc="left", fontsize=9)
+    save(fig, "Fig7a_optimized_benchmark.png")
+
+
 def fig_tradeoffs(R):
     a, b = R["ratio_rho"], R["ratio_mu"]
     fig, ax = plt.subplots(1, 2, figsize=(7.4, 3.0))
     rho = a["rho"]; ax[0].fill_between(rho, [r["q"][0] for r in a["rows"]], [r["q"][2] for r in a["rows"]], color=C1, alpha=0.3); ax[0].plot(rho, [r["q"][1] for r in a["rows"]], "o-", color=C1, ms=3)
-    ax[0].axhline(1, color="0.3", lw=1); ax[0].axhline(0.6, color=C2, ls="--", lw=1.2); ax[0].text(0.05, 0.62, "claimed $-$40%", color=C2, fontsize=7); ax[0].set_xscale("log"); ax[0].set_xlabel("Useful laser power / reactor power"); ax[0].set_ylabel("IMLEO(LANTP) / IMLEO(NTP)"); ax[0].set_title("(a) 5-95% band, median", loc="left", fontsize=9); ax[0].set_ylim(0.5, 4.5)
+    ax[0].axhline(1, color="0.3", lw=1); ax[0].axhline(0.6, color=C2, ls="--", lw=1.2); ax[0].text(0.05, 0.62, "targeted $-$40%", color=C2, fontsize=7); ax[0].set_xscale("log"); ax[0].set_xlabel("Useful laser power / reactor power"); ax[0].set_ylabel("IMLEO(LANTP) / IMLEO(NTP)"); ax[0].set_title("(a) 5-95% band, median", loc="left", fontsize=9); ax[0].set_ylim(0.5, 4.5)
     mu = b["mu"]
     for key, col, lab in (("design", C1, "$T_c$ = 4500 K design"), ("rho025", C3, "laser = 0.25 x reactor")):
         rows = b[key]; ax[1].fill_between(mu, [r["q"][0] for r in rows], [r["q"][2] for r in rows], color=col, alpha=0.2); ax[1].plot(mu, [r["q"][1] for r in rows], "o-", color=col, ms=3, label=lab)
@@ -171,6 +192,6 @@ def fig_ast(R):
 
 def make_all(R):
     os.makedirs(FIG, exist_ok=True)
-    for f in (fig_thermo, fig_power, fig_laser, fig_beam, fig_burn, fig_mc, fig_tradeoffs, fig_breakeven, fig_sens, fig_conv, fig_conting, fig_ast, fig_threshold):
+    for f in (fig_thermo, fig_power, fig_laser, fig_beam, fig_burn, fig_opt, fig_mc, fig_tradeoffs, fig_breakeven, fig_sens, fig_conv, fig_conting, fig_ast, fig_threshold):
         f(R)
     print("figures written")

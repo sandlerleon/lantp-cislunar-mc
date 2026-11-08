@@ -106,6 +106,14 @@ def test_independent_burn_integration():
     r = S.study_independent_burn()["rows"]
     assert len(r) == 6 and max(abs(x["diff"]) for x in r) < 0.01
     assert max(abs(x["t_model"] - x["t_independent"]) for x in r) <= 12.0
+    lim = S.study_independent_burn()["limit"]                                         # near-impulsive burns against the rocket equation
+    assert len(lim) == 6 and max(abs(x["diff"]) for x in lim) < 0.005
+
+
+def test_engine_mass_exponent():
+    S0 = Mi.nominal(1); S0["P_R"] = np.array([250e6]); D = Mi.make_design(S0); fx = dict(legs=2)
+    a = Mi.solve_mission(S0, D, fixed=dict(fx, eng_exp=1.0)); b = Mi.solve_mission(S0, D, fixed=dict(fx, eng_exp=1.3))
+    assert abs(b["m_eng"][0] / a["m_eng"][0] - 0.5 ** 0.3) < 1e-9                    # a smaller reactor is lighter per unit of thrust for x > 1
 
 
 def test_infrastructure_energy_consistency():

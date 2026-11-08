@@ -403,7 +403,7 @@ def study_asteroid(n=800, seed=SEED + 6):
 GRID_P = (25e6, 50e6, 100e6, 250e6, 500e6, 750e6, 1000e6, 1500e6, 2000e6)
 
 
-def study_opt_mc(n=500, seed=SEED + 9):
+def study_opt_mc(n=500, seed=SEED + 9, eng_exp=1.0):
     """primary benchmark: the conventional tug and the laser-assisted tug each with the reactor power that minimizes their own initial mass (grid of GRID_P), same payload, trajectory and margins;
     also the laser-assisted tug at the reactor power of the draw (100-500 MWt) against the best conventional tug"""
     S = Mi.sample(n, seed)
@@ -411,7 +411,7 @@ def study_opt_mc(n=500, seed=SEED + 9):
     for P in GRID_P:
         S2 = dict(S); S2["P_R"] = np.full(n, P)
         D = Mi.make_design(S2); D0 = Mi.make_design(S2, rho=0.0)
-        r = Mi.solve_mission(S2, D, fixed=dict(legs=2)); nt = Mi.solve_mission(S2, D0, receiver=False, fixed=dict(legs=2))
+        r = Mi.solve_mission(S2, D, fixed=dict(legs=2, eng_exp=eng_exp)); nt = Mi.solve_mission(S2, D0, receiver=False, fixed=dict(legs=2, eng_exp=eng_exp))
         Ml.append(r["M"]); Mn.append(nt["M"])
     Ml = np.array(Ml); Mn = np.array(Mn)
     bestL = np.nanmin(np.where(np.isfinite(Ml), Ml, np.inf), axis=0); bestN = np.nanmin(np.where(np.isfinite(Mn), Mn, np.inf), axis=0)
@@ -419,11 +419,22 @@ def study_opt_mc(n=500, seed=SEED + 9):
     ratio_opt = bestL / bestN
     # laser-assisted tug at the reactor power of the draw, against the best conventional tug
     S3 = Mi.sample(n, seed)
-    D = Mi.make_design(S3); r = Mi.solve_mission(S3, D, fixed=dict(legs=2))
+    D = Mi.make_design(S3); r = Mi.solve_mission(S3, D, fixed=dict(legs=2, eng_exp=eng_exp))
     ratio_claim_reactor = r["M"] / bestN
     return dict(n=n, grid_MW=[p / 1e6 for p in GRID_P], ratio_opt=ratio_opt.tolist(), ratio_claim_reactor=ratio_claim_reactor.tolist(), best_P_lantp=[GRID_P[i] / 1e6 for i in iL], best_P_ntp=[GRID_P[i] / 1e6 for i in iN],
                 M_lantp_opt=bestL.tolist(), M_ntp_opt=bestN.tolist(), q_ratio_opt=q(ratio_opt, (5, 25, 50, 75, 95)), q_ratio_claim_reactor=q(ratio_claim_reactor, (5, 25, 50, 75, 95)),
                 share_below_1=float(np.mean(ratio_opt < 1)), share_below_06=float(np.mean(ratio_opt <= 0.6)))
+
+
+def study_opt_scaling(n=150, seed=SEED + 21):
+    """audit of the reactor-size scaling of the optimized benchmark: the engine-system mass (reactor, shield, nozzle) is proportional to thrust at the nominal T/W (exponent 1); here it scales as
+    P_R**x relative to its value at 500 MWt for x = 0.7 (larger reactors lighter per unit thrust), 1.0 and 1.3 (larger reactors heavier per unit thrust)"""
+    rows = []
+    for x in (0.7, 1.0, 1.3):
+        r = study_opt_mc(n=n, seed=seed, eng_exp=x)
+        rows.append(dict(exp=x, q_ratio_opt=r["q_ratio_opt"], share_below_1=r["share_below_1"], P_ntp_median=float(np.median(r["best_P_ntp"])), P_lantp_median=float(np.median(r["best_P_lantp"])),
+                         P_ntp_q=q(r["best_P_ntp"], (5, 50, 95)), P_lantp_q=q(r["best_P_lantp"], (5, 50, 95)), M_ntp_median=float(np.median(r["M_ntp_opt"])), M_lantp_median=float(np.median(r["M_lantp_opt"]))))
+    return dict(n=n, rows=rows)
 
 
 SOBOL_KEYS = ["mu_rec", "P_R", "T_core", "p_c", "phi", "eta_n", "jit", "M2", "drop", "t_reacq", "f_tank", "TW", "eta_coup", "eta_abs"]
@@ -439,26 +450,42 @@ def _map_unit(U, keys):
     return S
 
 
-def study_sobol(N=256, seed=SEED + 10):
-    """variance-based sensitivity of the IMLEO ratio (Saltelli sampling; first-order index by the Saltelli 2010 estimator, total index by the Jansen estimator)"""
-    k = len(SOBOL_KEYS); rng = np.random.default_rng(seed)
-    A = rng.random((N, k)); B = rng.random((N, k))
+def _sobol_indices(f, N):
+    """Saltelli (2010) first-order and Jansen total-order estimators from the matrix of model outputs f (rows: A, B, AB_1..AB_k)"""
+    fA, fB = f[0][:N], f[1][:N]; k = f.shape[0] - 2
+    var = np.var(np.concatenate([fA, fB]), ddof=1)
+    S1 = np.array([np.mean(fB * (f[2 + i][:N] - fA)) / var for i in range(k)])
+    ST = np.array([0.5 * np.mean((fA - f[2 + i][:N]) ** 2) / var for i in range(k)])
+    return S1, ST
+
+
+def study_sobol(N=2048, seed=SEED + 10, nboot=300, chunk=4096):
+    """variance-based sensitivity of the IMLEO ratio. Scrambled Sobol quasi-random sequence (2k dimensions: A = first k, B = last k columns), Saltelli (2010) first-order and Jansen total-order
+    estimators, bootstrap intervals for both, convergence with the sample size N (the first N rows of a Sobol sequence are again a Sobol sequence), and the same indices for the logarithm of the ratio"""
+    from scipy.stats import qmc
+    k = len(SOBOL_KEYS)
+    X = qmc.Sobol(d=2 * k, scramble=True, seed=seed).random(N)
+    A, B = X[:, :k], X[:, k:]
     mats = [A, B] + [np.where(np.arange(k)[None, :] == i, B, A) for i in range(k)]
-    U = np.vstack(mats); S = _map_unit(U, SOBOL_KEYS)
-    r, nt, D = run_pair(S)
-    f = (r["M"] / nt["M"]).reshape(len(mats), N)
-    fA, fB = f[0], f[1]; var = np.var(np.concatenate([fA, fB]), ddof=1)
-    S1, ST = [], []
-    for i in range(k):
-        fAB = f[2 + i]
-        S1.append(float(np.mean(fB * (fAB - fA)) / var)); ST.append(float(0.5 * np.mean((fA - fAB) ** 2) / var))
-    # bootstrap intervals
-    bs = []
-    for _ in range(200):
-        ix = rng.integers(0, N, N); vv = np.var(np.concatenate([fA[ix], fB[ix]]), ddof=1)
-        bs.append([0.5 * np.mean((fA[ix] - f[2 + i][ix]) ** 2) / vv for i in range(k)])
-    bs = np.array(bs)
-    return dict(N=N, keys=SOBOL_KEYS, names=[SOBOL_NAMES[x] for x in SOBOL_KEYS], S1=S1, ST=ST, ST_lo=np.percentile(bs, 2.5, axis=0).tolist(), ST_hi=np.percentile(bs, 97.5, axis=0).tolist(), var=float(var), evaluations=int(U.shape[0]))
+    U = np.vstack(mats); out = []
+    for lo in range(0, U.shape[0], chunk):
+        r, nt, D = run_pair(_map_unit(U[lo:lo + chunk], SOBOL_KEYS)); out.append(r["M"] / nt["M"])
+    f = np.concatenate(out).reshape(len(mats), N)
+    rng = np.random.default_rng(seed)
+    res = {}
+    for tag, g in (("ratio", f), ("log", np.log(f))):
+        S1, ST = _sobol_indices(g, N); b1, bt = [], []
+        for _ in range(nboot):
+            ix = rng.integers(0, N, N); gg = g[:, ix]; s1, st = _sobol_indices(gg, N); b1.append(s1); bt.append(st)
+        b1, bt = np.array(b1), np.array(bt)
+        conv = {}
+        for n in [m for m in (128, 256, 512, 1024, 2048, 4096) if m <= N]:
+            s1, st = _sobol_indices(g, n); conv[str(n)] = dict(S1=s1.tolist(), ST=st.tolist())
+        res[tag] = dict(S1=S1.tolist(), ST=ST.tolist(), S1_lo=np.percentile(b1, 2.5, axis=0).tolist(), S1_hi=np.percentile(b1, 97.5, axis=0).tolist(),
+                        ST_lo=np.percentile(bt, 2.5, axis=0).tolist(), ST_hi=np.percentile(bt, 97.5, axis=0).tolist(), convergence=conv, var=float(np.var(g[:2].ravel(), ddof=1)))
+    d = dict(N=N, keys=SOBOL_KEYS, names=[SOBOL_NAMES[x] for x in SOBOL_KEYS], evaluations=int(U.shape[0]), sampling="scrambled Sobol sequence", **res["ratio"])
+    d["log"] = res["log"]
+    return d
 
 
 def study_threshold(nrho=12, nmu=14):
@@ -520,7 +547,14 @@ def study_independent_burn():
             m_ind = M - sol.y[4, -1]; t_ind = float(sol.t[-1])
             c, t, _ = L.burn("depart", mu, rc, eps, tab, mdot, np.ones(1), link, np.array([M]), np.array([False]), L.RE if mu == L.MU_E else L.RM, 100.0, 1000.0, dt=dt, tmax=40000.0)
             rows.append(dict(burn=name, M=M, propellant_independent=float(m_ind), propellant_model=float(c[0]), diff=float(c[0] / m_ind - 1), t_independent=t_ind, t_model=float(t[0])))
-    return dict(rows=rows)
+    # limiting case: a near-impulsive burn (thrust 40 times the nominal) of the mission model against the rocket equation with the impulsive delta-v of the same transfer (physical check of the mass flow and of the delta-v bookkeeping)
+    lim = []
+    for name, mu, rc, eps, dv, dt in (("TLI", L.MU_E, L.RE + 400.0, geo["eps_tli"], geo["dv_tli"], 0.1), ("lunar departure", L.MU_M, L.RM + 100.0, geo["vinf"] ** 2 / 2, math.sqrt(geo["vinf"] ** 2 + 2 * L.MU_M / (L.RM + 100.0)) - math.sqrt(L.MU_M / (L.RM + 100.0)), 0.05)):
+        for M in (40e3, 80e3, 160e3):
+            c, t, _ = L.burn("depart", mu, rc, eps, tab, mdot * 40, np.ones(1), link, np.array([M]), np.array([False]), L.RE if mu == L.MU_E else L.RM, 100.0, 1000.0, dt=dt, tmax=3000.0)
+            ref = M * (1 - math.exp(-dv * 1e3 / ve))
+            lim.append(dict(burn=name, M=M, dv=float(dv), propellant_model=float(c[0]), propellant_rocket_equation=float(ref), diff=float(c[0] / ref - 1)))
+    return dict(rows=rows, limit=lim)
 
 
 

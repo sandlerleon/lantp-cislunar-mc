@@ -20,7 +20,7 @@ RANGES = {   # name: (low, high, distribution)
 }
 NOMINAL = dict(P_R=500e6, T_core=2800.0, p_c=3e6, phi=0.3, eta_n=0.94, mu_rec=25.0, TW=5.0, f_tank=0.18, jit=0.05, M2=1.2, drop=0.05, t_reacq=30.0, eta_coup=0.9, eta_abs=0.95,
                eta_wp=0.4, e_spec=250.0, c_s=1.5e6, a_las=300.0, a_ap=15.0)
-FIXED = dict(Dt=10.0, r_R=3.0, eta_opt=0.9, m_pl=20000.0, m_misc=3000.0, f_res=0.05, missions_per_year=6.0, life_years=15.0, tof=2.0, node_km=1000.0, m_relay=2000.0)
+FIXED = dict(Dt=10.0, r_R=3.0, eta_opt=0.9, m_pl=20000.0, m_misc=3000.0, f_res=0.05, missions_per_year=6.0, life_years=15.0, tof=2.0, node_km=1000.0, m_relay=2000.0, eng_exp=1.0, P_ref=500e6)
 
 
 def sample(n, seed=2027, nominal_except=None):
@@ -88,7 +88,7 @@ def solve_mission(S, D, receiver=True, laser=(1, 1, 1, 1), mode="partial", nscan
     flags = [np.full(n, bool(f) and receiver) for f in laser]
     ve_full = tab[:, -1] * L.G0
     F_thr = mdot * ve_full
-    m_eng = F_thr / (L.G0 * S["TW"])
+    m_eng = F_thr / (L.G0 * S["TW"]) * (S["P_R"] / F_["P_ref"]) ** (F_["eng_exp"] - 1.0)     # engine system (reactor, shield, nozzle, turbopump): proportional to thrust unless eng_exp differs from 1
     P_use = D.rho * D.P_R if receiver else np.zeros(n)
     P_abs = P_use / S["eta_coup"]
     m_rec = S["mu_rec"] * P_abs / 1e6 if receiver else np.zeros(n)
