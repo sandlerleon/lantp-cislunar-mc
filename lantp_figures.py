@@ -113,9 +113,30 @@ def fig_breakeven(R):
 
 
 def fig_sens(R):
-    s = sorted(R["sensitivity"], key=lambda r: abs(r["rho"])); fig, ax = plt.subplots(figsize=(4.6, 3.1))
-    ax.barh(range(len(s)), [r["rho"] for r in s], color=[C2 if r["rho"] > 0 else C1 for r in s]); ax.set_yticks(range(len(s))); ax.set_yticklabels([r["name"] for r in s], fontsize=7); ax.axvline(0, color="k", lw=0.8)
-    ax.set_xlabel("Spearman rank correlation with the IMLEO ratio"); save(fig, "Fig10_sensitivity.png")
+    s = sorted(R["sensitivity"], key=lambda r: abs(r["rho"])); so = R["sobol"]
+    fig, ax = plt.subplots(1, 2, figsize=(7.8, 3.3))
+    ax[0].barh(range(len(s)), [r["rho"] for r in s], color=[C2 if r["rho"] > 0 else C1 for r in s]); ax[0].set_yticks(range(len(s))); ax[0].set_yticklabels([r["name"] for r in s], fontsize=7); ax[0].axvline(0, color="k", lw=0.8)
+    ax[0].set_xlabel("Spearman rank correlation with the IMLEO ratio"); ax[0].set_title("(a)", loc="left", fontsize=9)
+    o = np.argsort(so["ST"]); y = np.arange(len(o))
+    ax[1].barh(y + 0.2, [so["ST"][i] for i in o], 0.4, color=C2, label="total index $S_T$", xerr=[[so["ST"][i] - so["ST_lo"][i] for i in o], [so["ST_hi"][i] - so["ST"][i] for i in o]], error_kw=dict(lw=0.7))
+    ax[1].barh(y - 0.2, [so["S1"][i] for i in o], 0.4, color=C1, label="first-order index $S_1$")
+    ax[1].set_yticks(y); ax[1].set_yticklabels([so["names"][i] for i in o], fontsize=7); ax[1].axvline(0, color="k", lw=0.8); ax[1].set_xlabel("Sobol index of the IMLEO ratio"); ax[1].legend(frameon=False, fontsize=7, loc="lower right"); ax[1].set_title("(b)", loc="left", fontsize=9)
+    save(fig, "Fig10_sensitivity.png")
+
+
+def fig_threshold(R):
+    t = R["threshold"]; Z = np.array(t["ratio"]); P = np.array(t["P_use_GW"]); mu = np.array(t["mu"]); Tc = np.array(t["Tc"])
+    fig, ax = plt.subplots(figsize=(5.2, 3.9))
+    cs = ax.contourf(P, mu, Z.T, levels=[0.5, 0.6, 0.8, 0.9, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0], cmap="RdYlBu_r", extend="both"); fig.colorbar(cs, ax=ax, label="IMLEO ratio")
+    c1 = ax.contour(P, mu, Z.T, levels=[1.0], colors="k", linewidths=1.4); ax.clabel(c1, fmt="ratio 1", fontsize=7)
+    c9 = ax.contour(P, mu, Z.T, levels=[0.9], colors="k", linewidths=0.9, linestyles="--"); ax.clabel(c9, fmt="0.9", fontsize=7)
+    Tm = 4232.0
+    if Tc.max() > Tm:
+        Pm = float(np.interp(Tm, Tc, P)); ax.axvspan(Pm, P.max(), facecolor="none", hatch="//", edgecolor="0.3", lw=0); ax.axvline(Pm, color="0.2", lw=1.0)
+        ax.text(Pm * 0.97, 12.0, "chamber above 4232 K (highest measured melting temperature) →", fontsize=6.3, rotation=90, ha="right", va="bottom")
+    ax.text(P.min() * 1.1, 1.2, "mass-beneficial region\n(below the line)", fontsize=7)
+    ax.set_xscale("log"); ax.set_yscale("log"); ax.set_xlabel("Useful laser power (GW), reactor 500 MWt"); ax.set_ylabel("Receiver specific mass (kg per MW absorbed)")
+    save(fig, "Fig13_threshold_map.png")
 
 
 def fig_conv(R):
@@ -145,11 +166,11 @@ def fig_ast(R):
     for k, col in (("10", C1), ("30", C3), ("100", C2)):
         ax[1].plot(P, np.maximum(a["largest_diameter"][k], 0.5), "o-", ms=3, color=col, label="%s m aperture" % k)
     ax[1].axhspan(40, 90, color=C2, alpha=0.15); ax[1].text(0.35, 55, "2024 YR4 class", fontsize=7); ax[1].set_xscale("log"); ax[1].set_yscale("log"); ax[1].set_xlabel("Emitted laser power (GW)"); ax[1].set_ylabel("Largest deflectable diameter (m)"); ax[1].legend(frameon=False, fontsize=7); ax[1].set_title("(b) median over uncertainty", loc="left", fontsize=9)
-    save(fig, "Fig13_asteroid.png")
+    save(fig, "FigS1_asteroid.png")
 
 
 def make_all(R):
     os.makedirs(FIG, exist_ok=True)
-    for f in (fig_thermo, fig_power, fig_laser, fig_beam, fig_burn, fig_mc, fig_tradeoffs, fig_breakeven, fig_sens, fig_conv, fig_conting, fig_ast):
+    for f in (fig_thermo, fig_power, fig_laser, fig_beam, fig_burn, fig_mc, fig_tradeoffs, fig_breakeven, fig_sens, fig_conv, fig_conting, fig_ast, fig_threshold):
         f(R)
     print("figures written")

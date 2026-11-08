@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Builds manuscript/LANTP_AST_Manuscript.docx and the Supplementary Information from results/results.json, so that every number in the text
+"""Builds manuscript/LANTP_CEAS_Manuscript.docx and the Supplementary Information from results/results.json, so that every number in the text
 is the simulation's.
 
     python build_manuscript.py
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     cit = E.Citations(LIB)
     scan_all(cit)
-    build(os.path.join(OUT, "LANTP_AST_Manuscript.docx"), B, cit, TITLE, journal=True)
+    build(os.path.join(OUT, "LANTP_CEAS_Manuscript.docx"), B, cit, TITLE, journal=True)
     build(os.path.join(OUT, "LANTP_Supplementary_Information.docx"), BS, cit, "Supplementary Information: " + TITLE)
     skip = ("CRediT", "Declaration", "Funding", "Data and", "Code and", "Competing", "Author contributions", "Availability", "Use of generative")
     words = sum(len(b[1].split()) for b in B if b[0] in ("p", "p0", "num") and not b[1].startswith(skip))

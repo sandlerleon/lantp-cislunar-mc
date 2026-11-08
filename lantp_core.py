@@ -279,6 +279,7 @@ def burn(kind, mu, rc, eps_target, table, mdot, rho_frac, link, m0, laser_on, Rb
         t += dt
         if rec:
             hist.append((t, Rk.copy(), occ.copy(), isp.copy(), cap.copy()))
+    burned = np.where(done, burned, 1e12)             # the target was not reached within the time limit: the burn is infeasible (never silently truncated)
     return burned, tb, hist
 
 

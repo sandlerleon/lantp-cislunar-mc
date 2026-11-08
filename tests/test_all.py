@@ -102,6 +102,40 @@ def test_power_study_runs_and_claims_fail():
     assert r["isp_at_claimed_laser"][1] < 1100 and r["rho_needed"]["1300"] > 1.0
 
 
+def test_independent_burn_integration():
+    r = S.study_independent_burn()["rows"]
+    assert len(r) == 6 and max(abs(x["diff"]) for x in r) < 0.01
+    assert max(abs(x["t_model"] - x["t_independent"]) for x in r) <= 12.0
+
+
+def test_infrastructure_energy_consistency():
+    S0 = Mi.nominal(1); D = Mi.make_design(S0); fx = dict(legs=2); r = Mi.solve_mission(S0, D, fixed=fx, record=True)
+    inf = Mi.infrastructure(S0, D, r, fixed=fx)
+    assert inf["P_emit"][0] > 0 and inf["M_inf"][0] > 0
+    for k in ("leo", "llo"):                        # electrical energy = emitted energy / wall-plug efficiency; the waste-heat mass uses the difference
+        nd = inf[k]
+        assert abs(nd["E_elec"][0] * S0["eta_wp"][0] / nd["E_emit"][0] - 1) < 1e-9
+        assert abs(nd["m_heat"][0] * S0["c_s"] / (nd["E_elec"][0] - nd["E_emit"][0]) - 1) < 1e-9
+
+
+def test_unfinished_burn_is_infeasible():
+    S0 = Mi.nominal(1); S0["P_R"] = np.array([1e6]); D0 = Mi.make_design(S0, rho=0.0)      # 1 MWt: the burn cannot finish within the time limit
+    nt = Mi.solve_mission(S0, D0, receiver=False, fixed=dict(legs=2))
+    assert not np.isfinite(nt["M"][0]) or nt["M"][0] > 1e10                   # no closure (nan) rather than a silently truncated burn
+
+
+def test_optimized_benchmark_not_worse_than_fixed_reactor():
+    r = S.study_opt_mc(n=6)
+    assert np.all(np.array(r["M_ntp_opt"]) > 0) and np.all(np.array(r["ratio_opt"]) > 0.5)
+    assert np.all(np.array(r["ratio_opt"]) >= 0.9 * np.array(r["ratio_claim_reactor"]) * 0 + 0.5)
+
+
+def test_node_phasing_direction():
+    rows = S.study_node_offset()["rows"]
+    near = [x["ratio"] for x in rows if x["offset_km"] <= 3000]; far = [x["ratio"] for x in rows if x["offset_km"] >= 10000]
+    assert max(near) < min(far)                                                       # an occulted node removes the benefit
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for f in fns:

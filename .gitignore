@@ -5,3 +5,4 @@ results/run_*.log
 _*.py
 _sheet*.png
 ~$*
+manuscript/_superseded/

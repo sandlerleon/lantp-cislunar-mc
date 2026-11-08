@@ -12,7 +12,7 @@ OUT = os.path.join(ROOT, "manuscript")
 R = json.load(open(os.path.join(ROOT, "results", os.environ.get("LANTP_RESULTS", "results.json")), encoding="utf-8"))
 DOIS = json.load(open(os.path.join(HERE, "dois.json"), encoding="utf-8"))
 GITHUB = "https://github.com/sandlerleon/lantp-cislunar-mc"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 EMAIL = "sandler.leon@gmail.com"
 TITLE = "Laser-Assisted Nuclear Thermal Propulsion for Cislunar Logistics: A Monte Carlo Power-Closure Assessment"
 
@@ -30,7 +30,7 @@ def pc(x, d=0):
     return n(100.0 * x, d) + "%"
 
 
-FIGNUM = {"arch": 1, "thermo": 2, "power": 3, "laser": 4, "beam": 5, "burn": 6, "mc": 7, "trade": 8, "be": 9, "sens": 10, "conv": 11, "cont": 12, "ast": 13}
+FIGNUM = {"arch": 1, "thermo": 2, "power": 3, "laser": 4, "beam": 5, "burn": 6, "mc": 7, "trade": 8, "be": 9, "sens": 10, "conv": 11, "cont": 12, "thr": 13}
 TABNUM = {"val": 1, "rng": 2, "chain": 3, "claims": 4, "infra": 5, "cont": 6, "mat": 7, "rt": 8}
 _TOK = re.compile(r"@([FT]):(\w+)@")
 
@@ -69,6 +69,7 @@ import numpy as np                                                    # noqa: E4
 
 TH, PW, LT, BM, NOM, MC, SENS, CONV = R["thermo"], R["power"], R["laser_thrust"], R["beam"], R["nominal"], R["mc"], R["sensitivity"], R["convergence"]
 RR, RM, BE, CT, AST = R["ratio_rho"], R["ratio_mu"], R["breakeven"], R["contingency"], R["asteroid"]
+OPT, SOB, THR, NOFF, IBURN = R["opt_mc"], R["sobol"], R["threshold"], R["node_offset"], R["independent_burn"]
 RATIO = np.array(MC["ratio"], float); FIN = np.isfinite(RATIO)
 RQ = np.percentile(RATIO[FIN], [5, 25, 50, 75, 95])
 ISPD = np.array(MC["isp_design"]); ISPE = np.array(MC["isp_eff_tli"], float)

@@ -54,26 +54,27 @@ def _link(S, t_out=None):
     return L.Link(np.full(n, FIXED["Dt"]) if "Dt" not in S else S["Dt"], np.full(n, FIXED["r_R"]), S["M2"], S["jit"], S["drop"], S["t_reacq"], t_out)
 
 
-def burned_chain(M, tables, mdot, rho_frac, link, geo, flags, pl=None, rng_seed=7, rec=None, legs=4):
+def burned_chain(M, tables, mdot, rho_frac, link, geo, flags, pl=None, rng_seed=7, rec=None, legs=4, node_km=None):
     pl = FIXED["m_pl"] if pl is None else pl
+    node_km = FIXED["node_km"] if node_km is None else node_km
     """propellant burned by the four burns of the round trip (TLI, LOI, TEI, LEO capture) starting from the mass M (kg); flags: laser on per burn (bool arrays)"""
     n = M.shape[0]
     m = M.copy(); b = []; times = []; tup = []
     rng = np.random.default_rng(rng_seed)
     # burn 1: TLI (Earth, departure)
     tbl = tables
-    c1, t1, h1 = L.burn("depart", L.MU_E, L.RE + 400.0, geo["eps_tli"], tbl, mdot, rho_frac, link, m, flags[0], L.RE, 100.0, FIXED["node_km"], dt=10.0, tmax=24000.0, rng=rng, rec=bool(rec))
+    c1, t1, h1 = L.burn("depart", L.MU_E, L.RE + 400.0, geo["eps_tli"], tbl, mdot, rho_frac, link, m, flags[0], L.RE, 100.0, node_km, dt=10.0, tmax=24000.0, rng=rng, rec=bool(rec))
     m = m - c1
     t_half = float(np.median(t1)) * 0.5 * geo["dv_loi"] / geo["dv_tli"]
-    c2, t2, h2 = L.burn("brake", L.MU_M, L.RM + 100.0, None, tbl, mdot, rho_frac, link, m, flags[1], L.RM, 20.0, FIXED["node_km"], t_half=t_half, vp=math.sqrt(geo["vinf"] ** 2 + 2 * L.MU_M / (L.RM + 100.0)), dt=4.0, tmax=9000.0, rng=rng, rec=bool(rec))
+    c2, t2, h2 = L.burn("brake", L.MU_M, L.RM + 100.0, None, tbl, mdot, rho_frac, link, m, flags[1], L.RM, 20.0, node_km, t_half=t_half, vp=math.sqrt(geo["vinf"] ** 2 + 2 * L.MU_M / (L.RM + 100.0)), dt=4.0, tmax=9000.0, rng=rng, rec=bool(rec))
     m = m - c2 - pl
     if legs == 2:
         z = np.zeros(n); ht = []
         return [c1, c2, z, z], [t1, t2, z, z], (h1, h2, [], [])
-    c3, t3, h3 = L.burn("depart", L.MU_M, L.RM + 100.0, geo["vinf"] ** 2 / 2, tbl, mdot, rho_frac, link, m, flags[2], L.RM, 20.0, FIXED["node_km"], dt=4.0, tmax=9000.0, rng=rng, rec=bool(rec))
+    c3, t3, h3 = L.burn("depart", L.MU_M, L.RM + 100.0, geo["vinf"] ** 2 / 2, tbl, mdot, rho_frac, link, m, flags[2], L.RM, 20.0, node_km, dt=4.0, tmax=9000.0, rng=rng, rec=bool(rec))
     m = m - c3
     t_half4 = float(np.median(t1)) * 0.5
-    c4, t4, h4 = L.burn("brake", L.MU_E, L.RE + 400.0, None, tbl, mdot, rho_frac, link, m, flags[3], L.RE, 100.0, FIXED["node_km"], t_half=t_half4, vp=geo["vp"], dt=10.0, tmax=24000.0, rng=rng, rec=bool(rec))
+    c4, t4, h4 = L.burn("brake", L.MU_E, L.RE + 400.0, None, tbl, mdot, rho_frac, link, m, flags[3], L.RE, 100.0, node_km, t_half=t_half4, vp=geo["vp"], dt=10.0, tmax=24000.0, rng=rng, rec=bool(rec))
     return [c1, c2, c3, c4], [t1, t2, t3, t4], (h1, h2, h3, h4)
 
 
@@ -96,7 +97,7 @@ def solve_mission(S, D, receiver=True, laser=(1, 1, 1, 1), mode="partial", nscan
     lo = np.full(n, pl + 2 * m_fixed + 1.0); hi = np.full(n, 3.0e6)
 
     def G(M):
-        c, t, h = burned_chain(M, tab, mdot, np.ones(n), link, geo, flags, pl, rec=False, legs=F_.get("legs", 4))
+        c, t, h = burned_chain(M, tab, mdot, np.ones(n), link, geo, flags, pl, rec=False, legs=F_.get("legs", 4), node_km=F_["node_km"])
         burned = sum(c)
         return M - (pl + m_fixed + (1 + S["f_tank"]) * (1 + F_["f_res"]) * burned), c, t
     # G(M) is negative for small M (the burns exhaust the propellant), positive in a window and negative again for very large M (the burns are cut off by their time limit):
@@ -116,7 +117,7 @@ def solve_mission(S, D, receiver=True, laser=(1, 1, 1, 1), mode="partial", nscan
     g, c, t = G(np.where(found, M, lo))
     out = dict(M=M, burned=sum(c), c=c, t=t, m_eng=m_eng, m_rec=m_rec, F=F_thr, mdot=mdot, ve=ve_full, P_use=P_use, P_abs=P_abs, tab=tab, Tc=Tc_tab[:, -1], geo=geo, resid=g)
     if record:
-        out["hist"] = burned_chain(M, tab, mdot, np.ones(n), link, geo, flags, pl, rec=True, legs=F_.get("legs", 4))[2]
+        out["hist"] = burned_chain(M, tab, mdot, np.ones(n), link, geo, flags, pl, rec=True, legs=F_.get("legs", 4), node_km=F_["node_km"])[2]
     return out
 
 

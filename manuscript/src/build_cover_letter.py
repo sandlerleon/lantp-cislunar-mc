@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cover letter for the submission to Aerospace Science and Technology (Elsevier); numbers from results/results.json, DOIs from dois.json.
+"""Cover letter for the submission to CEAS Space Journal (Springer); numbers from results/results.json, DOIs from dois.json.
 
     python build_cover_letter.py   -> manuscript/LANTP_Cover_Letter.docx
 """
@@ -33,21 +33,22 @@ for t in ("Independent Researcher", "Northbrook, Illinois, USA", EMAIL, "ORCID 0
     para(t, after=0)
 para("")
 para(datetime.date.today().strftime("%d %B %Y").lstrip("0"))
-para("The Editor-in-Chief", after=0); para("Aerospace Science and Technology", after=0); para("Elsevier")
+para("The Editor-in-Chief", after=0); para("CEAS Space Journal", after=0); para("Springer Nature")
 para("Dear Editor,")
-para("I submit the manuscript “%s” as a research article for consideration in Aerospace Science and Technology." % TITLE)
-para("Laser-assisted nuclear thermal propulsion (LANTP) is proposed as a way to raise the specific impulse of a nuclear thermal tug for Earth–Moon logistics by adding orbital laser power to the hydrogen. The performance claimed for such concepts (specific impulse 1300–1500 s, thrust 50–120 kN, a laser of 1–50 MW on a 100–500 MWt reactor, "
-     "and 40% lower initial mass in low Earth orbit than conventional nuclear thermal propulsion) has not been tested against a coupled model. The manuscript does so with a model in which the thermochemistry of dissociating hydrogen, the power chain from the electrical supply to the propellant, the optical link along finite burns with occultation and dropouts, "
-     "the mass of the receiver and of the laser nodes, and the propellant reserve for laser outages are solved together, and it quantifies the conditions under which the laser assistance is an advantage and those under which it is inferior to conventional NTP.")
-para("The manuscript makes four contributions to the aerospace-propulsion literature. (i) A validated hydrogen model (checked against Cantera) shows that a useful laser power of %s to %s times the reactor power is needed for 1300–1500 s, so that a 1–50 MW laser reaches at most about %s s, and that 50–120 kN needs gigawatts of emitted power. "
-     "(ii) A beam-link and finite-burn analysis shows that the beam can act only within a few 10⁴ km of a node and that relay beaming over the Earth–Moon distances is excluded. (iii) A Monte Carlo analysis over assumed ranges gives a median initial mass %s times that of conventional NTP (5th–95th percentile %s–%s), with none of the draws at the claimed 0.6, "
-     "the receiver specific mass as the dominant parameter, a narrow break-even region (best ratio %s) and laser nodes whose mass exceeds that of the tug by orders of magnitude. (iv) A contingency analysis shows that carrying the propellant to complete the transfer after a single laser fault raises the median ratio to %s, and the paper states a set of explicit, falsifiable conditions for the concept."
-     % (n(PW["rho_needed"]["1300"], 1), n(PW["rho_needed"]["1500"], 1), r100(max(PW["isp_at_claimed_laser"])), n(RQ[2], 1), n(RQ[0], 1), n(RQ[4], 1), n(float(np.nanmin(Zg)), 2), n(POL[PK[1]]["q"][2], 1)))
-para("The study is explicit about what it is. Every design input is an assumed range, because no measurement of such a system exists; the performance claims tested are those of the concept description, which the manuscript does not cite and which should be checked; "
-     "and the results are conditional on the assumed ranges and are not a general statement that laser power cannot assist nuclear thermal propulsion.")
+para("I submit the manuscript “%s” as an original research article for consideration in the CEAS Space Journal." % TITLE)
+para("Laser-assisted nuclear thermal propulsion (LANTP) is proposed as a way to raise the specific impulse of a nuclear thermal tug for Earth–Moon logistics by adding orbital laser power to the hydrogen. Concepts of this kind are described with performance targets (specific impulse 1300–1500 s, thrust 50–120 kN, a laser of 1–50 MW on a 100–500 MWt reactor, "
+     "and an initial mass in low Earth orbit 40% below that of conventional nuclear thermal propulsion). The targets come from a concept description that is not in the open literature, so the manuscript treats them as hypothetical design targets and tests them with a coupled model of the thermochemistry of dissociating hydrogen, the power chain from the electrical supply to the propellant, the optical link along finite burns with occultation and dropouts, "
+     "the masses of the receiver and of the laser nodes, and the propellant reserve for laser outages. It quantifies the conditions under which the laser assistance is an advantage and those under which it is inferior to a conventional tug with an optimized reactor.")
+para("The manuscript makes five contributions. (i) A hydrogen model checked against Cantera at identical conditions shows that a useful laser power of %s to %s times the reactor power is needed for 1300–1500 s, so that a 1–50 MW laser reaches at most about %s s, and that 50–120 kN needs gigawatts of emitted power. "
+     "(ii) A beam-link and finite-burn analysis shows that the beam can act only within a few 10⁴ km of a node that is held near the vehicle. (iii) A Monte Carlo analysis with a conventional benchmark whose reactor is sized for the payload gives a median initial-mass ratio of %s (5th–95th percentile %s–%s) with no draw at the targeted 0.6, "
+     "and Sobol indices identify the receiver specific mass and the reactor power as the dominant parameters. (iv) A technology-threshold map gives the receiver specific mass below which a mass benefit exists for any laser power (best case: %s). "
+     "(v) Laser nodes of about %s kt and a propellant reserve for a single laser fault remove the benefit, and the paper states explicit, falsifiable conditions for the concept."
+     % (n(PW["rho_needed"]["1300"], 1), n(PW["rho_needed"]["1500"], 1), r100(max(PW["isp_at_claimed_laser"])), n(OPT["q_ratio_opt"][2], 2), n(OPT["q_ratio_opt"][0], 2), n(OPT["q_ratio_opt"][4], 2), pc(1 - float(np.nanmin(np.array(THR["ratio"], float))), 0), n(NOM["M_inf"] / 1e6, 0)))
+para("The study is explicit about what it is. Every design input is an assumed range, because no measurement of such a system exists; the heating of the hydrogen to 4500 K without a solid wall at that temperature is a design target that is not modeled; "
+     "and the results are conditional on the assumed ranges and are not a general statement that laser power cannot assist nuclear thermal propulsion. The mission and mass model has a single implementation, while the thermochemistry and the finite-burn integrator were verified against independent solvers.")
 para("The code, the data behind every figure and table, the tests and the manuscript sources are openly available at %s and archived at https://doi.org/%s (code, all versions); the manuscript and its Supplementary Information are archived at https://doi.org/%s "
      "(all versions). One command regenerates every number and figure." % (GITHUB, DOIS["code_concept"], DOIS["paper_concept"]))
-para("Disclosure. The work received no external funding and I have no competing interests.")
+para("Declarations. The work received no external funding and I have no competing interests.")
 para("Author affiliation and email address. I am an independent researcher with no current institutional affiliation, and I am the sole author. The corresponding-author email address, %s, is my personal address." % EMAIL)
 para("A generative AI tool (Claude, Anthropic) assisted with drafting text, writing and testing simulation code and generating figures from that code; I reviewed and edited all of it and take full responsibility for the content, as disclosed in the manuscript. "
      "The manuscript is original, has not been published elsewhere and is not under consideration at any other journal. I am the sole author.")

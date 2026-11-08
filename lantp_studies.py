@@ -61,7 +61,7 @@ def study_thermo():
             g.TPX = Tc, pc, "H2:1"; g.equilibrate("TP"); g.SP = s, pe; g.equilibrate("SP"); sh = math.sqrt(2 * (hc - g.enthalpy_mass)) / G0
             mf = float(L.exhaust(np.array([Tc]), np.array([pc]), Mi.P_E_RATIO, 0.0, 1.0, "partial")[0] / G0)
             ms = float(L.exhaust(np.array([Tc]), np.array([pc]), Mi.P_E_RATIO, 0.0, 1.0, "shifting")[0] / G0)
-            val["isp"].append(dict(Tc=Tc, p_c=pc, frozen_mine=mf, frozen_ref=fr, shifting_mine=ms, shifting_ref=sh))
+            val["isp"].append(dict(Tc=Tc, p_c=pc, frozen_mine=mf, frozen_ref=fr, shifting_mine=ms, shifting_ref=sh, frozen_mine94=0.94 * mf, shifting_mine94=0.94 * ms, frozen_ref94=0.94 * fr, shifting_ref94=0.94 * sh))
         val["tool"] = "Cantera " + ct.__version__ + " (h2o2.yaml)"
     except Exception as e:      # pragma: no cover
         val["error"] = str(e)
@@ -266,7 +266,7 @@ def study_nominal(record=True):
                P_R=float(S["P_R"][0]), P_use=float(r["P_use"][0]), P_abs=float(inf["P_abs"][0]), P_rec=float(inf["P_rec"][0]), P_emit=float(inf["P_emit"][0]), P_elec=float(inf["P_elec"][0]),
                P_waste_node=float(inf["P_elec"][0] - inf["P_emit"][0]), P_waste_rec=float(inf["P_abs"][0] - inf["P_use"][0]),
                M_inf=float(inf["M_inf"][0]), M_inf_per_mission=float(inf["M_inf_per_mission"][0]), N_life=float(inf["N_life"]),
-               infra={k: {kk: float(vv[0]) for kk, vv in inf[k].items()} for k in ("leo", "llo")}, ratio=float(r["M"][0] / nt["M"][0]),
+               infra={k: {kk: float(vv[0]) for kk, vv in inf[k].items()} for k in ("leo", "llo")}, ratio=float(r["M"][0] / nt["M"][0]), P_rec_over_use=float(inf["P_rec"][0] / r["P_use"][0]),
                geo=dict(dv_tli=geo_dv("tli"), dv_loi=geo_dv("loi")))
     if record:
         h1, h2 = r["hist"][0], r["hist"][1]
@@ -399,6 +399,131 @@ def study_asteroid(n=800, seed=SEED + 6):
     return out
 
 
+# ================================================================================================ 8. version 1.1.0 studies
+GRID_P = (25e6, 50e6, 100e6, 250e6, 500e6, 750e6, 1000e6, 1500e6, 2000e6)
+
+
+def study_opt_mc(n=500, seed=SEED + 9):
+    """primary benchmark: the conventional tug and the laser-assisted tug each with the reactor power that minimizes their own initial mass (grid of GRID_P), same payload, trajectory and margins;
+    also the laser-assisted tug at the reactor power of the draw (100-500 MWt) against the best conventional tug"""
+    S = Mi.sample(n, seed)
+    Ml, Mn = [], []
+    for P in GRID_P:
+        S2 = dict(S); S2["P_R"] = np.full(n, P)
+        D = Mi.make_design(S2); D0 = Mi.make_design(S2, rho=0.0)
+        r = Mi.solve_mission(S2, D, fixed=dict(legs=2)); nt = Mi.solve_mission(S2, D0, receiver=False, fixed=dict(legs=2))
+        Ml.append(r["M"]); Mn.append(nt["M"])
+    Ml = np.array(Ml); Mn = np.array(Mn)
+    bestL = np.nanmin(np.where(np.isfinite(Ml), Ml, np.inf), axis=0); bestN = np.nanmin(np.where(np.isfinite(Mn), Mn, np.inf), axis=0)
+    iL = np.argmin(np.where(np.isfinite(Ml), Ml, np.inf), axis=0); iN = np.argmin(np.where(np.isfinite(Mn), Mn, np.inf), axis=0)
+    ratio_opt = bestL / bestN
+    # laser-assisted tug at the reactor power of the draw, against the best conventional tug
+    S3 = Mi.sample(n, seed)
+    D = Mi.make_design(S3); r = Mi.solve_mission(S3, D, fixed=dict(legs=2))
+    ratio_claim_reactor = r["M"] / bestN
+    return dict(n=n, grid_MW=[p / 1e6 for p in GRID_P], ratio_opt=ratio_opt.tolist(), ratio_claim_reactor=ratio_claim_reactor.tolist(), best_P_lantp=[GRID_P[i] / 1e6 for i in iL], best_P_ntp=[GRID_P[i] / 1e6 for i in iN],
+                M_lantp_opt=bestL.tolist(), M_ntp_opt=bestN.tolist(), q_ratio_opt=q(ratio_opt, (5, 25, 50, 75, 95)), q_ratio_claim_reactor=q(ratio_claim_reactor, (5, 25, 50, 75, 95)),
+                share_below_1=float(np.mean(ratio_opt < 1)), share_below_06=float(np.mean(ratio_opt <= 0.6)))
+
+
+SOBOL_KEYS = ["mu_rec", "P_R", "T_core", "p_c", "phi", "eta_n", "jit", "M2", "drop", "t_reacq", "f_tank", "TW", "eta_coup", "eta_abs"]
+SOBOL_NAMES = {"mu_rec": "receiver specific mass", "P_R": "reactor power", "T_core": "core temperature limit", "p_c": "chamber pressure", "phi": "nozzle recombination", "eta_n": "nozzle efficiency", "jit": "pointing jitter",
+               "M2": "beam quality", "drop": "dropout rate", "t_reacq": "re-acquisition time", "f_tank": "tank fraction", "TW": "engine T/W", "eta_coup": "coupling efficiency", "eta_abs": "absorption efficiency"}
+
+
+def _map_unit(U, keys):
+    S = {k: np.full(U.shape[0], v, float) for k, v in Mi.NOMINAL.items()}
+    for j, k in enumerate(keys):
+        lo, hi, d = Mi.RANGES[k]
+        S[k] = lo + (hi - lo) * U[:, j] if d == "u" else lo * (hi / lo) ** U[:, j]
+    return S
+
+
+def study_sobol(N=256, seed=SEED + 10):
+    """variance-based sensitivity of the IMLEO ratio (Saltelli sampling; first-order index by the Saltelli 2010 estimator, total index by the Jansen estimator)"""
+    k = len(SOBOL_KEYS); rng = np.random.default_rng(seed)
+    A = rng.random((N, k)); B = rng.random((N, k))
+    mats = [A, B] + [np.where(np.arange(k)[None, :] == i, B, A) for i in range(k)]
+    U = np.vstack(mats); S = _map_unit(U, SOBOL_KEYS)
+    r, nt, D = run_pair(S)
+    f = (r["M"] / nt["M"]).reshape(len(mats), N)
+    fA, fB = f[0], f[1]; var = np.var(np.concatenate([fA, fB]), ddof=1)
+    S1, ST = [], []
+    for i in range(k):
+        fAB = f[2 + i]
+        S1.append(float(np.mean(fB * (fAB - fA)) / var)); ST.append(float(0.5 * np.mean((fA - fAB) ** 2) / var))
+    # bootstrap intervals
+    bs = []
+    for _ in range(200):
+        ix = rng.integers(0, N, N); vv = np.var(np.concatenate([fA[ix], fB[ix]]), ddof=1)
+        bs.append([0.5 * np.mean((fA[ix] - f[2 + i][ix]) ** 2) / vv for i in range(k)])
+    bs = np.array(bs)
+    return dict(N=N, keys=SOBOL_KEYS, names=[SOBOL_NAMES[x] for x in SOBOL_KEYS], S1=S1, ST=ST, ST_lo=np.percentile(bs, 2.5, axis=0).tolist(), ST_hi=np.percentile(bs, 97.5, axis=0).tolist(), var=float(var), evaluations=int(U.shape[0]))
+
+
+def study_threshold(nrho=12, nmu=14):
+    """technology-threshold map of the nominal vehicle: IMLEO ratio on a fine grid of useful laser power and receiver specific mass, the receiver specific mass at which the ratio is 1, 0.9 and 0.6,
+    and the chamber temperature of each laser power"""
+    P_R = Mi.NOMINAL["P_R"]
+    rho = np.geomspace(0.1, 2.4, nrho); mu = np.geomspace(1.0, 60.0, nmu)
+    RH, MU = np.meshgrid(rho, mu, indexing="ij")
+    S = Mi.nominal(RH.size); S["mu_rec"] = MU.ravel()
+    r, nt, D = run_pair(S, rho=RH.ravel())
+    Z = (r["M"] / nt["M"]).reshape(RH.shape)
+    out = dict(rho=rho.tolist(), mu=mu.tolist(), P_use_GW=(rho * P_R / 1e9).tolist(), ratio=Z.tolist())
+    Tc = []
+    for rr in rho:
+        S1 = Mi.nominal(1); D1 = Mi.make_design(S1, rho=rr); h = L.h_mix(D1.T_core, L.alpha_eq(D1.T_core, D1.p_c)); hi_ = L.h_mix(np.array([100.0]), L.alpha_eq(np.array([100.0]), D1.p_c))
+        Tc.append(float(L.temp_from_enthalpy(h + rr * (h - hi_), D1.p_c)[0]))
+    out["Tc"] = Tc
+    for level in (1.0, 0.9, 0.6):
+        out["mu_star_%g" % level] = []
+        for i in range(nrho):
+            ys = Z[i, :]; xs = mu
+            m = None
+            for j in range(len(xs) - 1):
+                if (ys[j] - level) * (ys[j + 1] - level) <= 0 and ys[j] != ys[j + 1]:
+                    m = float(math.exp(math.log(xs[j]) + (level - ys[j]) / (ys[j + 1] - ys[j]) * (math.log(xs[j + 1]) - math.log(xs[j])))); break
+            if m is None and ys[0] < level:
+                m = float(xs[-1])          # ratio stays below the level over the whole range
+            out["mu_star_%g" % level].append(m)
+    return out
+
+
+def study_node_offset():
+    """sensitivity to the phasing of the laser nodes: initial separation between node and vehicle at the start of each burn (km); nominal vehicle"""
+    rows = []
+    for off in (500.0, 1000.0, 3000.0, 10000.0, 20000.0, 30000.0):
+        S = Mi.nominal(1); D = Mi.make_design(S); D0 = Mi.make_design(S, rho=0.0)
+        r = Mi.solve_mission(S, D, fixed=dict(legs=2, node_km=off), record=True); nt = Mi.solve_mission(S, D0, receiver=False, fixed=dict(legs=2))
+        h = r["hist"][0]
+        rows.append(dict(offset_km=off, ratio=float(r["M"][0] / nt["M"][0]), M=float(r["M"][0]), t_tli_min=float(r["t"][0][0] / 60), t_loi_min=float(r["t"][1][0] / 60),
+                         R_max_km=float(max(x[1][0] for x in h)), occulted_min=float(sum(1 for x in h if x[2][0]) * 10 / 60), isp_min=float(min(x[3][0] for x in h))))
+    return dict(rows=rows)
+
+
+def study_independent_burn():
+    """independent integration of finite burns with an adaptive 8th-order Runge-Kutta scheme (scipy DOP853, tight tolerances, event at the target energy) against the fixed-step
+    vectorized integrator of the mission model, constant specific impulse (laser off); TLI and the lunar departure burn"""
+    from scipy.integrate import solve_ivp
+    S = Mi.nominal(1); D0 = Mi.make_design(S, rho=0.0)
+    tab, mdot, *_ = L.make_table(D0); ve = float(tab[0, -1]) * G0; md = float(mdot[0]); geo = L.transfer_dv(2.0); link = Mi._link(S)
+    rows = []
+    for name, mu, rc, eps, dt in (("TLI", L.MU_E, L.RE + 400.0, geo["eps_tli"], 10.0), ("lunar departure", L.MU_M, L.RM + 100.0, geo["vinf"] ** 2 / 2, 4.0)):
+        for M in (40e3, 80e3, 160e3):
+            def f(t, y):
+                x, yy, vx, vy, m = y; r = math.hypot(x, yy); v = math.hypot(vx, vy); a = md * ve / m / 1000.0
+                return [vx, vy, -mu * x / r ** 3 + a * vx / v, -mu * yy / r ** 3 + a * vy / v, -md]
+            ev = lambda t, y: 0.5 * (y[2] ** 2 + y[3] ** 2) - mu / math.hypot(y[0], y[1]) - eps
+            ev.terminal = True; ev.direction = 1
+            sol = solve_ivp(f, [0, 40000], [rc, 0.0, 0.0, math.sqrt(mu / rc), M], method="DOP853", rtol=1e-11, atol=1e-9, events=ev)
+            m_ind = M - sol.y[4, -1]; t_ind = float(sol.t[-1])
+            c, t, _ = L.burn("depart", mu, rc, eps, tab, mdot, np.ones(1), link, np.array([M]), np.array([False]), L.RE if mu == L.MU_E else L.RM, 100.0, 1000.0, dt=dt, tmax=40000.0)
+            rows.append(dict(burn=name, M=M, propellant_independent=float(m_ind), propellant_model=float(c[0]), diff=float(c[0] / m_ind - 1), t_independent=t_ind, t_model=float(t[0])))
+    return dict(rows=rows)
+
+
+
 # ================================================================================================ driver
 def run_all(quick=False):
     os.makedirs(RES, exist_ok=True); os.makedirs(FIG, exist_ok=True)
@@ -422,6 +547,11 @@ def run_all(quick=False):
     step("roundtrip", study_roundtrip)
     step("ntp_reactor", study_ntp_reactor)
     step("asteroid", study_asteroid, max(int(800 * k), 100))
+    step("opt_mc", study_opt_mc, max(int(500 * k), 40))
+    step("sobol", study_sobol, 256 if not quick else 24)
+    step("threshold", study_threshold)
+    step("node_offset", study_node_offset)
+    step("independent_burn", study_independent_burn)
     R["runtime_s"] = round(time.time() - t0, 1)
     path = os.path.join(RES, "results_quick.json" if quick else "results.json")
     json.dump(R, open(path, "w"), indent=1, default=float)

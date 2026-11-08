@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Supplementary information."""
+import math
+
 from common import *
 
 Zg = np.array(BE["ratio_mu_rho"], float); Ns = np.array(BE["N_star"], float)
@@ -56,7 +58,30 @@ if RT:
 pv = [[k, n(np.nanpercentile(v, 5), 2), n(np.nanpercentile(v, 50), 2), n(np.nanpercentile(v, 95), 2)] for k, v in (("Isp at 4500 K design (s)", ISPD), ("Effective Isp of TLI (s)", ISPE), ("IMLEO ratio", RATIO), ("IMLEO ratio with infrastructure", RATIO_INF), ("Emitted laser power (GW)", PEMIT), ("Electrical power at the node (GW)", PELEC), ("Infrastructure mass (t)", MINF))]
 adds(("table", "Table S16. Percentiles of the main Monte Carlo outputs (%s draws)." % n(MC["n"]), ["Output", "5th", "50th", "95th"], pv, [3.2, 1.0, 1.0, 1.0]))
 
-adds(("h1", "S4. Reproducibility"))
+adds(("h1", "S4. Studies added in version 1.1.0"))
+rows = [["Isp frozen" if k == "f" else "Isp shifting", "%g K, %g MPa" % (i["Tc"], i["p_c"] / 1e6), n(i["frozen_ref" if k == "f" else "shifting_ref"], 0), n(i["frozen_mine" if k == "f" else "shifting_mine"], 0), n(i["frozen_ref94" if k == "f" else "shifting_ref94"], 0), n(i["frozen_mine94" if k == "f" else "shifting_mine94"], 0)] for k in ("f", "s") for i in VAL["isp"]]
+adds(("table", "Table S17. Specific impulse (s) of Cantera and of this model at the nozzle efficiency of 1 and of 0.94 (identical temperature, pressure and expansion ratio).", ["Quantity", "Condition", "Cantera, $η_n$ = 1", "This model, $η_n$ = 1", "Cantera × 0.94", "This model, $η_n$ = 0.94"], rows, [1.3, 1.5, 1.0, 1.0, 1.0, 1.0], 14))
+rows = [[n(r["offset_km"], 0), n(r["ratio"], 2), n(r["M"] / 1e3, 0), n(r["t_tli_min"], 0), n(r["R_max_km"], 0), n(r["occulted_min"], 1), n(r["isp_min"], 0)] for r in NOFF["rows"]]
+adds(("table", "Table S18. Phasing of the laser node: initial separation between node and vehicle, IMLEO ratio at equal reactor power, initial mass, TLI burn time, largest node–vehicle range during TLI, time with the line of sight blocked during TLI, and lowest instantaneous specific impulse (nominal vehicle).", ["Separation (km)", "Ratio", "Mass (t)", "TLI (min)", "Max range (km)", "Occulted (min)", "Min Isp (s)"], rows, [1.1, 0.7, 0.8, 0.8, 1.0, 1.0, 0.9], 14))
+rows = [[r["burn"], n(r["M"] / 1e3, 0), n(r["propellant_independent"], 0), n(r["propellant_model"], 0), pc(r["diff"], 2), n(r["t_independent"], 0), n(r["t_model"], 0)] for r in IBURN["rows"]]
+adds(("table", "Table S19. Independent integration (adaptive DOP853) and mission-model integration (fixed step) of finite burns with constant specific impulse: propellant (kg), difference and burn time (s).", ["Burn", "Mass (t)", "Propellant, independent", "Propellant, model", "Difference", "Time, independent", "Time, model"], rows, [1.4, 0.7, 1.1, 1.0, 0.8, 0.9, 0.8], 14))
+rows = [[nm_, n(a, 3), n(b, 3), "%s–%s" % (n(lo, 3), n(hi, 3))] for nm_, a, b, lo, hi in sorted(zip(SOB["names"], SOB["S1"], SOB["ST"], SOB["ST_lo"], SOB["ST_hi"]), key=lambda t: -t[2])]
+adds(("table", "Table S20. Sobol indices of the IMLEO ratio at equal reactor power (%s model evaluations): first-order index, total index and 95%% bootstrap interval of the total index." % n(SOB["evaluations"]), ["Parameter", "First-order", "Total", "Total, 95% interval"], rows, [2.6, 1.0, 1.0, 1.4]))
+rows = [[n(r_, 2), n(P_, 2), n(t_, 0), n(a_, 1) if a_ else "–", n(b_, 1) if b_ else "–"] for r_, P_, t_, a_, b_ in zip(THR["rho"], THR["P_use_GW"], THR["Tc"], THR["mu_star_1"], THR["mu_star_0.9"])]
+adds(("table", "Table S21. Technology-threshold map: laser fraction, useful laser power (reactor 500 MWt), chamber temperature at that power, and the receiver specific mass (kg/MW) below which the IMLEO ratio is below 1 and below 0.9 (– : not reached down to 1 kg/MW).", ["Laser fraction", "Useful power (GW)", "Chamber T (K)", "Receiver for ratio < 1", "Receiver for ratio < 0.9"], rows, [1.1, 1.2, 1.1, 1.3, 1.3]))
+rows = [["median", n(OPT["q_ratio_opt"][2], 2), n(OPT["q_ratio_claim_reactor"][2], 2)], ["5th percentile", n(OPT["q_ratio_opt"][0], 2), n(OPT["q_ratio_claim_reactor"][0], 2)], ["25th percentile", n(OPT["q_ratio_opt"][1], 2), n(OPT["q_ratio_claim_reactor"][1], 2)],
+        ["75th percentile", n(OPT["q_ratio_opt"][3], 2), n(OPT["q_ratio_claim_reactor"][3], 2)], ["95th percentile", n(OPT["q_ratio_opt"][4], 2), n(OPT["q_ratio_claim_reactor"][4], 2)]]
+adds(("table", "Table S22. IMLEO ratio against the conventional tug with an optimized reactor (%s draws): both tugs optimized, and the laser-assisted tug at the reactor power of the draw." % n(OPT["n"]), ["Statistic", "Both optimized", "LANTP at the reactor of the draw"], rows, [1.8, 1.5, 2.2]))
+
+adds(("h1", "S5. Directed-energy deflection of an asteroid (illustrative extension)"))
+D_ast = np.array(AST["main"]["D"]); q50_ = np.array(AST["main"]["q50"]); q95_ = np.array(AST["main"]["q95"]); lp_ = AST["largest_diameter"]; Pg_ = AST["P_gw"]
+adds(("p", fmt("A beam of the power that LANTP would need could in principle also be used to deflect an asteroid [@Lubin2015]. A simple model, given as an illustration and not as a result of the transport analysis: the beam of 1.4 GW from a 10 m aperture reaches the asteroid at a range of 3×10$^4$–3×10$^5$ km, the spot size follows from the optical model of Section 4.1, the momentum coupling saturates at 30–300 µN/W with a half-saturation intensity of 10$^8$–10$^{10}$ W/m², "
+               "and the irradiation lasts half of a lead time of 1–10 days; the displacement achieved at the Earth is divided by the required miss of one Earth radius. The median ratio is <<a40>> for a 40 m asteroid and <<a90>> for a 90 m asteroid (95th percentile <<b40>> and <<b90>>) (Fig. S1a), and the largest diameter that is deflected is <<d1>> m at 1.4 GW and <<d2>> m at 30 GW with a 10 m aperture (Fig. S1b). The result depends on the assumed coupling and lead time and is a limitation of the concept, not a prediction.",
+               a40=sci(float(np.interp(math.log(40), np.log(D_ast), q50_))), a90=sci(float(np.interp(math.log(90), np.log(D_ast), q50_))), b40=sci(float(np.interp(math.log(40), np.log(D_ast), q95_))), b90=sci(float(np.interp(math.log(90), np.log(D_ast), q95_))),
+               d1="less than 1" if float(np.interp(math.log(1.4), np.log(Pg_), lp_["10"])) < 1 else n(float(np.interp(math.log(1.4), np.log(Pg_), lp_["10"])), 0), d2=n(lp_["10"][-1], 0))))
+adds(("fig", "FigS1_asteroid.png", "Fig. S1. (a) Achieved over required displacement against asteroid diameter for 1.4 GW and a 10 m aperture (median and 5–95% band; shaded: 40–90 m class). (b) Largest diameter that is deflected against the emitted power for three apertures.", 6.2))
+
+adds(("h1", "S6. Reproducibility"))
 adds(("p", fmt("The repository (%s, version %s) contains the model (lantp_core.py, lantp_mission.py), the studies (lantp_studies.py), the figure code (lantp_figures.py), the results (results/results.json), the automated tests (tests/test_all.py) and the manuscript sources. "
-               "Commands: python lantp_studies.py --all runs every study (about 30 min on one core) and writes results/results.json and the figures; python tests/test_all.py runs the tests. Every study uses fixed seeds (base seed %s; the Monte Carlo draws use seed %s). "
+               "Commands: python lantp_studies.py --all runs every study (about 40 min on one core) and writes results/results.json and the figures; python tests/test_all.py runs the tests. Every study uses fixed seeds (base seed %s; the Monte Carlo draws use seed %s). "
                "Dependencies: Python 3, numpy, scipy, matplotlib; Cantera for the validation of the thermodynamics. The design inputs are the ranges of Table @T:rng@ (listed with their nominal values in results/results.json under params)." % (GITHUB, VERSION, R["seed"], MC["seed"]))))
