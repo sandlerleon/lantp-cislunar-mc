@@ -277,7 +277,7 @@ def study_nominal(record=True):
 
 # ================================================================================================ 5. sensitivity and convergence
 SENS_NAMES = {"mu_rec": "receiver specific mass", "P_R": "reactor power", "phi": "nozzle recombination $\\phi$", "p_c": "chamber pressure", "jit": "pointing jitter", "f_tank": "tank fraction",
-              "t_reacq": "re-acquisition time", "TW": "engine T/W", "M2": "beam quality $M^2$", "drop": "dropout rate"}
+              "t_reacq": "reacquisition time", "TW": "engine T/W", "M2": "beam quality $M^2$", "drop": "dropout rate"}
 
 
 def study_sensitivity(mc):
@@ -439,7 +439,7 @@ def study_opt_scaling(n=150, seed=SEED + 21):
 
 SOBOL_KEYS = ["mu_rec", "P_R", "T_core", "p_c", "phi", "eta_n", "jit", "M2", "drop", "t_reacq", "f_tank", "TW", "eta_coup", "eta_abs"]
 SOBOL_NAMES = {"mu_rec": "receiver specific mass", "P_R": "reactor power", "T_core": "core temperature limit", "p_c": "chamber pressure", "phi": "nozzle recombination", "eta_n": "nozzle efficiency", "jit": "pointing jitter",
-               "M2": "beam quality", "drop": "dropout rate", "t_reacq": "re-acquisition time", "f_tank": "tank fraction", "TW": "engine T/W", "eta_coup": "coupling efficiency", "eta_abs": "absorption efficiency"}
+               "M2": "beam quality", "drop": "dropout rate", "t_reacq": "reacquisition time", "f_tank": "tank fraction", "TW": "engine T/W", "eta_coup": "coupling efficiency", "eta_abs": "absorption efficiency"}
 
 
 def _map_unit(U, keys):

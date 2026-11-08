@@ -12,9 +12,15 @@ OUT = os.path.join(ROOT, "manuscript")
 R = json.load(open(os.path.join(ROOT, "results", os.environ.get("LANTP_RESULTS", "results.json")), encoding="utf-8"))
 DOIS = json.load(open(os.path.join(HERE, "dois.json"), encoding="utf-8"))
 GITHUB = "https://github.com/sandlerleon/lantp-cislunar-mc"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 EMAIL = "sandler.leon@gmail.com"
 TITLE = "Laser-Assisted Nuclear Thermal Propulsion for Cislunar Logistics: A Monte Carlo Power-Closure Assessment"
+
+
+def jand(items):
+    """Oxford-comma list: a, b, and c"""
+    items = list(items)
+    return items[0] if len(items) == 1 else (" and ".join(items) if len(items) == 2 else ", ".join(items[:-1]) + ", and " + items[-1])
 
 
 def n(x, d=0):

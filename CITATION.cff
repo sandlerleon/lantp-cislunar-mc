@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software or the manuscript, please cite them as below."
 title: "LANTP: Monte Carlo power-closure assessment of laser-assisted nuclear thermal propulsion for cislunar logistics (lantp-cislunar-mc)"
-version: "1.2.0"
+version: "1.2.1"
 date-released: "2026-11-08"
 license: MIT
 repository-code: "https://github.com/sandlerleon/lantp-cislunar-mc"
