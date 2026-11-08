@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+results/results_quick.json
+results/run_*.log
+_*.py
+_sheet*.png
+~$*

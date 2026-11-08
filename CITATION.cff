@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software or the manuscript, please cite them as below."
+title: "LANTP: Monte Carlo power-closure assessment of laser-assisted nuclear thermal propulsion for cislunar logistics (lantp-cislunar-mc)"
+version: "1.0.0"
+date-released: "2026-11-08"
+license: MIT
+repository-code: "https://github.com/sandlerleon/lantp-cislunar-mc"
+doi: "10.5281/zenodo.24048703"
+authors:
+  - family-names: Sandler
+    given-names: Leon
+    orcid: "https://orcid.org/0009-0007-4584-808X"
+    affiliation: "Independent Researcher"
+preferred-citation:
+  type: article
+  title: "Laser-Assisted Nuclear Thermal Propulsion for Cislunar Logistics: A Monte Carlo Power-Closure Assessment"
+  authors:
+    - family-names: Sandler
+      given-names: Leon
+  notes: "Manuscript prepared for Aerospace Science and Technology; archived at 10.5281/zenodo.24048701"
